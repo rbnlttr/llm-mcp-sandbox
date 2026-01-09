@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Upload, Trash2, Send, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { FileText, Upload, Trash2, Send, Loader2, CheckCircle, XCircle, AlertCircle, Server, Cloud, Cpu } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -11,12 +11,15 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [apiStatus, setApiStatus] = useState(null);
+  const [models, setModels] = useState([]);
+  const [useLocal, setUseLocal] = useState(true);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Check API health on mount
   useEffect(() => {
     checkApiHealth();
+    fetchModels();
   }, []);
 
   // Auto-scroll to bottom when messages change
@@ -28,8 +31,18 @@ const App = () => {
     try {
       const response = await axios.get(`${API_URL}/health`);
       setApiStatus(response.data);
+      setUseLocal(response.data.default_llm === 'local');
     } catch (error) {
       setApiStatus({ status: 'error', message: 'Backend nicht erreichbar' });
+    }
+  };
+
+  const fetchModels = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/models`);
+      setModels(response.data.models || []);
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
     }
   };
 
@@ -107,6 +120,7 @@ const App = () => {
       const response = await axios.post(`${API_URL}/chat`, {
         message: currentInput,
         documents: documents,
+        use_local: useLocal,
       });
 
       const assistantMessage = {
@@ -114,6 +128,8 @@ const App = () => {
         content: response.data.response,
         timestamp: new Date().toISOString(),
         usage: response.data.usage,
+        model: response.data.model,
+        llmType: response.data.llm_type,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -147,6 +163,26 @@ const App = () => {
     setMessages([]);
   };
 
+  const getModelBadge = (llmType) => {
+    if (llmType === 'local') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-900/30 border border-green-700 rounded text-xs text-green-400">
+          <Cpu className="w-3 h-3" />
+          Lokal
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-900/30 border border-blue-700 rounded text-xs text-blue-400">
+        <Cloud className="w-3 h-3" />
+        Cloud
+      </span>
+    );
+  };
+
+  const canUseLocal = apiStatus?.ollama_available;
+  const canUseClaude = apiStatus?.claude_available;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-7xl mx-auto">
@@ -157,29 +193,55 @@ const App = () => {
               <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 LLM MCP Sandbox
               </h1>
-              <p className="text-slate-400">Lokale Dokumentenverarbeitung mit Model Context Protocol</p>
+              <p className="text-slate-400">Lokale Dokumentenverarbeitung mit Ollama & Claude</p>
             </div>
-            {apiStatus && (
-              <div className={`px-4 py-2 rounded-lg border ${
-                apiStatus.status === 'healthy' 
-                  ? 'bg-green-900/30 border-green-700 text-green-400'
-                  : 'bg-red-900/30 border-red-700 text-red-400'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {apiStatus.status === 'healthy' ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <XCircle className="w-4 h-4" />
-                  )}
-                  <span className="text-sm">
-                    {apiStatus.status === 'healthy' 
-                      ? `Backend: ${apiStatus.api_configured ? '✓ API konfiguriert' : '⚠ API Key fehlt'}`
-                      : 'Backend offline'
-                    }
-                  </span>
-                </div>
+            <div className="flex items-center gap-3">
+              {/* LLM Switcher */}
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg">
+                <button
+                  onClick={() => setUseLocal(true)}
+                  disabled={!canUseLocal}
+                  className={`px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                    useLocal 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <Cpu className="w-4 h-4" />
+                  Ollama
+                </button>
+                <button
+                  onClick={() => setUseLocal(false)}
+                  disabled={!canUseClaude}
+                  className={`px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                    !useLocal 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <Cloud className="w-4 h-4" />
+                  Claude
+                </button>
               </div>
-            )}
+              
+              {/* Status */}
+              {apiStatus && (
+                <div className={`px-4 py-2 rounded-lg border ${
+                  apiStatus.status === 'healthy' 
+                    ? 'bg-green-900/30 border-green-700 text-green-400'
+                    : 'bg-red-900/30 border-red-700 text-red-400'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <Server className="w-4 h-4" />
+                    <span className="text-sm">
+                      {apiStatus.ollama_available ? '✓ Ollama' : '✗ Ollama'}
+                      {' | '}
+                      {apiStatus.claude_available ? '✓ Claude' : '✗ Claude'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -218,13 +280,13 @@ const App = () => {
               />
             </div>
 
-            {!apiStatus?.api_configured && (
+            {!canUseLocal && !canUseClaude && (
               <div className="mb-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-md">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
                   <div className="text-xs text-yellow-400">
-                    <p className="font-semibold mb-1">API Key nicht konfiguriert</p>
-                    <p>Füge deinen Anthropic API Key in die .env Datei ein und starte den Container neu.</p>
+                    <p className="font-semibold mb-1">Keine LLMs verfügbar</p>
+                    <p>Starte Ollama oder konfiguriere Claude API Key.</p>
                   </div>
                 </div>
               </div>
@@ -259,7 +321,7 @@ const App = () => {
                         )}
                         {file.status === 'processed' && file.content && (
                           <p className="text-xs text-slate-500 mt-1">
-                            {file.content.length} Zeichen extrahiert
+                            {file.content.length} Zeichen
                           </p>
                         )}
                       </div>
@@ -295,7 +357,7 @@ const App = () => {
                 <div className="h-full flex items-center justify-center text-slate-500">
                   <div className="text-center">
                     <p className="text-sm mb-2">Starte eine Konversation</p>
-                    <p className="text-xs">Lade zuerst Dokumente hoch und stelle dann Fragen</p>
+                    <p className="text-xs">Wähle ein LLM, lade Dokumente hoch und stelle Fragen</p>
                   </div>
                 </div>
               ) : (
@@ -312,17 +374,25 @@ const App = () => {
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
-                        <p className="text-sm font-medium mb-1 text-slate-300">
-                          {msg.role === 'user' ? 'Du' : 'Claude'}
-                        </p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-sm font-medium text-slate-300">
+                            {msg.role === 'user' ? 'Du' : 'Assistent'}
+                          </p>
+                          {msg.llmType && getModelBadge(msg.llmType)}
+                        </div>
                         <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                         <div className="flex items-center gap-3 mt-2">
                           <p className="text-xs text-slate-500">
                             {new Date(msg.timestamp).toLocaleTimeString('de-DE')}
                           </p>
+                          {msg.model && (
+                            <p className="text-xs text-slate-500">
+                              {msg.model}
+                            </p>
+                          )}
                           {msg.usage && (
                             <p className="text-xs text-slate-500">
-                              Tokens: {msg.usage.input_tokens} in / {msg.usage.output_tokens} out
+                              {msg.usage.prompt_tokens || msg.usage.input_tokens} → {msg.usage.completion_tokens || msg.usage.output_tokens} tokens
                             </p>
                           )}
                         </div>
@@ -335,7 +405,9 @@ const App = () => {
                 <div className="p-4 bg-slate-700/50 border border-slate-600 rounded-lg mr-8">
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                    <span className="text-sm text-slate-400">Claude denkt nach...</span>
+                    <span className="text-sm text-slate-400">
+                      {useLocal ? 'Ollama' : 'Claude'} denkt nach...
+                    </span>
                   </div>
                 </div>
               )}
@@ -353,12 +425,12 @@ const App = () => {
                     ? "Lade zuerst Dokumente hoch..." 
                     : "Stelle eine Frage zu deinen Dokumenten..."
                 }
-                disabled={loading || files.length === 0 || !apiStatus?.api_configured}
+                disabled={loading || files.length === 0 || (!canUseLocal && !canUseClaude)}
                 className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button
                 onClick={handleSubmit}
-                disabled={loading || !input.trim() || files.length === 0 || !apiStatus?.api_configured}
+                disabled={loading || !input.trim() || files.length === 0 || (!canUseLocal && !canUseClaude)}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
               >
                 {loading ? (
@@ -372,35 +444,44 @@ const App = () => {
         </div>
 
         {/* Info Panel */}
-        <div className="mt-4 p-4 bg-slate-800/30 border border-slate-700 rounded-lg">
-          <h3 className="text-sm font-semibold mb-2 text-slate-300">System-Informationen:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-400">
-            <div>
-              <p className="font-semibold text-slate-300 mb-1">Backend Features:</p>
-              <ul className="space-y-1">
-                <li>• FastAPI mit automatischer API-Dokumentation</li>
-                <li>• PyPDF2 für PDF-Extraktion</li>
-                <li>• python-docx für Word-Dokumente</li>
-                <li>• openpyxl für Excel-Dateien</li>
-                <li>• python-pptx für PowerPoint-Präsentationen</li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-300 mb-1">Sicherheit:</p>
-              <ul className="space-y-1">
-                <li>• Alle Dateien werden lokal verarbeitet</li>
-                <li>• Nur extrahierter Text wird an Claude API gesendet</li>
-                <li>• API Key nur im Backend Container</li>
-                <li>• Uploads im isolierten Docker Volume</li>
-              </ul>
-            </div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-lg">
+            <h3 className="text-sm font-semibold mb-2 text-slate-300 flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-green-400" />
+              Lokale Modelle (Ollama)
+            </h3>
+            {models.filter(m => m.type === 'local').length > 0 ? (
+              <div className="space-y-1">
+                {models.filter(m => m.type === 'local').map((model, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span className={model.available ? 'text-green-400' : 'text-red-400'}>
+                      {model.available ? '✓' : '✗'} {model.name}
+                    </span>
+                    {model.size && (
+                      <span className="text-slate-500">
+                        {(model.size / 1e9).toFixed(1)} GB
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">Keine Modelle geladen</p>
+            )}
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-700">
-            <p className="text-xs text-slate-500">
-              API-Dokumentation: <a href={`${API_URL}/docs`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                {API_URL}/docs
-              </a>
-            </p>
+
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-lg">
+            <h3 className="text-sm font-semibold mb-2 text-slate-300 flex items-center gap-2">
+              <Cloud className="w-4 h-4 text-blue-400" />
+              Cloud Modelle
+            </h3>
+            <div className="space-y-1 text-xs">
+              {models.filter(m => m.type === 'cloud').map((model, idx) => (
+                <div key={idx} className={model.available ? 'text-green-400' : 'text-red-400'}>
+                  {model.available ? '✓' : '✗'} {model.name}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -409,4 +490,3 @@ const App = () => {
 };
 
 export default App;
-
