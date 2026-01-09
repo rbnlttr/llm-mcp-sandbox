@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+__pycache__/
+
+# Environment
+.env
+
+# Uploads
+uploads/
+
+# Build
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
