@@ -33,7 +33,7 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 LOCAL_MODEL = os.getenv("LOCAL_MODEL", "llama3.2")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if (ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()) else None
 
 
 class ChatRequest(BaseModel):
@@ -280,7 +280,7 @@ async def get_models():
     # Check Claude
     models.append({
         "name": "claude-sonnet-4",
-        "available": ANTHROPIC_API_KEY is not None,
+        "available": bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()),
         "type": "cloud"
     })
     
@@ -302,7 +302,7 @@ async def health():
         "status": "healthy",
         "ollama_available": ollama_available,
         "ollama_host": OLLAMA_HOST,
-        "claude_available": ANTHROPIC_API_KEY is not None,
+        "claude_available": bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()),
         "default_llm": "local" if USE_LOCAL_LLM else "cloud"
     }
 
