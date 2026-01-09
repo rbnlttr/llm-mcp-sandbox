@@ -30,6 +30,54 @@ Bearbeite `.env` und füge deinen Anthropic API Key ein:
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+### 1. **Projekt-Ordner** (`./project/`)
+
+Hier legst du deinen **aktuellen Projektcode und -dokumentation** ab:
+
+- Source Code (Python, JS, Java, etc.)
+- Projektdokumentation (MD, TXT)
+- Technische Spezifikationen
+- README-Dateien
+- Konfigurationsdateien
+
+**Beispiel:**
+
+```text
+project/
+├── src/
+│   ├── main.py
+│   └── utils.py
+├── docs/
+│   ├── architecture.md
+│   └── api.md
+└── README.md
+```
+
+### 2. **Referenz-Ordner** (`./reference/`)
+
+Hier legst du **Normen, Standards und Richtlinien** ab:
+
+- ISO-Normen (PDF)
+- DIN-Standards
+- Unternehmensrichtlinien
+- Best Practices
+- Coding Standards
+- Compliance-Dokumente
+
+**Beispiel:**
+
+```text
+reference/
+├── ISO/
+│   ├── ISO-9001-2015.pdf
+│   └── ISO-27001.pdf
+├── DIN/
+│   └── DIN-EN-62304.pdf
+└── company/
+    ├── coding-standards.md
+    └── review-process.pdf
+```
+
 ## Starten
 
 Beim ersten Start lädt Ollama automatisch das gewählte Modell herunter (kann einige Minuten dauern):

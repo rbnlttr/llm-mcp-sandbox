@@ -22,11 +22,18 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OLLAMA_HOST=http://ollama:11434
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - USE_LOCAL_LLM=${USE_LOCAL_LLM:-true}
+      - LOCAL_MODEL=${LOCAL_MODEL:-llama3.2}
       - UPLOAD_DIR=/app/uploads
+      - PROJECT_DIR=/app/project
+      - REFERENCE_DIR=/app/reference
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
+      - ./project:/app/project
+      - ./reference:/app/reference
       - /app/__pycache__
     depends_on:
       - ollama

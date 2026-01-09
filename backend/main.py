@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import os
 import anthropic
 from pathlib import Path
@@ -13,6 +13,7 @@ from pptx import Presentation
 import io
 import httpx
 import json
+from datetime import datetime
 
 app = FastAPI(title="LLM MCP Sandbox API")
 
@@ -25,27 +26,44 @@ app.add_middleware(
 )
 
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./uploads"))
+PROJECT_DIR = Path(os.getenv("PROJECT_DIR", "./project"))
+REFERENCE_DIR = Path(os.getenv("REFERENCE_DIR", "./reference"))
+
 UPLOAD_DIR.mkdir(exist_ok=True)
+PROJECT_DIR.mkdir(exist_ok=True)
+REFERENCE_DIR.mkdir(exist_ok=True)
 
 # Configuration
 USE_LOCAL_LLM = os.getenv("USE_LOCAL_LLM", "true").lower() == "true"
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 LOCAL_MODEL = os.getenv("LOCAL_MODEL", "llama3.2")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_AVAILABLE = ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if (ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()) else None
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if (ANTHROPIC_AVAILABLE) else None
+# Cache for directory contents
+_directory_cache = {}
 
 
 class ChatRequest(BaseModel):
     message: str
     documents: List[dict]
     use_local: Optional[bool] = None
+    include_project: Optional[bool] = True
+    include_reference: Optional[bool] = True
 
 
 class ModelInfo(BaseModel):
     name: str
     available: bool
     type: str
+
+
+class DirectoryInfo(BaseModel):
+    path: str
+    files: List[dict]
+    total_size: int
+    file_count: int
 
 
 def extract_text_from_pdf(file_content: bytes) -> str:
@@ -105,6 +123,76 @@ def extract_text_from_pptx(file_content: bytes) -> str:
         raise HTTPException(status_code=400, detail=f"PPTX extraction failed: {str(e)}")
 
 
+def extract_text_from_file(file_path: Path) -> str:
+    """Extract text from any supported file"""
+    try:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+        
+        filename = file_path.name.lower()
+        
+        if filename.endswith('.pdf'):
+            return extract_text_from_pdf(content)
+        elif filename.endswith('.docx'):
+            return extract_text_from_docx(content)
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            return extract_text_from_xlsx(content)
+        elif filename.endswith('.pptx'):
+            return extract_text_from_pptx(content)
+        elif filename.endswith('.txt') or filename.endswith('.md'):
+            return content.decode('utf-8')
+        elif filename.endswith(('.py', '.js', '.java', '.cpp', '.c', '.h', '.cs', '.go', '.rs')):
+            return content.decode('utf-8')
+        else:
+            return f"[Unsupported file type: {filename}]"
+    except Exception as e:
+        return f"[Error reading {file_path.name}: {str(e)}]"
+
+
+def scan_directory(directory: Path, max_files: int = 100) -> Dict:
+    """Scan directory and extract content from all supported files"""
+    if not directory.exists():
+        return {"files": [], "total_size": 0, "file_count": 0}
+    
+    files = []
+    total_size = 0
+    file_count = 0
+    
+    supported_extensions = {
+        '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx',
+        '.txt', '.md', '.py', '.js', '.java', '.cpp', '.c', 
+        '.h', '.cs', '.go', '.rs', '.json', '.yaml', '.yml'
+    }
+    
+    for file_path in directory.rglob('*'):
+        if file_path.is_file() and file_count < max_files:
+            if file_path.suffix.lower() in supported_extensions:
+                try:
+                    size = file_path.stat().st_size
+                    content = extract_text_from_file(file_path)
+                    
+                    relative_path = file_path.relative_to(directory)
+                    
+                    files.append({
+                        "name": file_path.name,
+                        "path": str(relative_path),
+                        "size": size,
+                        "content": content,
+                        "modified": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+                    })
+                    
+                    total_size += size
+                    file_count += 1
+                except Exception as e:
+                    print(f"Error processing {file_path}: {e}")
+    
+    return {
+        "files": files,
+        "total_size": total_size,
+        "file_count": file_count
+    }
+
+
 async def chat_with_ollama(prompt: str, system_prompt: str) -> dict:
     """Chat with local Ollama LLM"""
     try:
@@ -147,7 +235,7 @@ def chat_with_claude(prompt: str, system_prompt: str) -> dict:
     try:
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=2000,
+            max_tokens=4000,
             system=system_prompt,
             messages=[
                 {"role": "user", "content": prompt}
@@ -178,7 +266,12 @@ async def root():
         "status": "ok",
         "message": "LLM MCP Sandbox API",
         "local_llm_enabled": USE_LOCAL_LLM,
-        "local_model": LOCAL_MODEL if USE_LOCAL_LLM else None
+        "local_model": LOCAL_MODEL if USE_LOCAL_LLM else None,
+        "directories": {
+            "project": str(PROJECT_DIR),
+            "reference": str(REFERENCE_DIR),
+            "uploads": str(UPLOAD_DIR)
+        }
     }
 
 
@@ -216,26 +309,87 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/directories/project")
+async def get_project_directory():
+    """Get project directory contents"""
+    result = scan_directory(PROJECT_DIR)
+    return {
+        "path": str(PROJECT_DIR),
+        "files": result["files"],
+        "total_size": result["total_size"],
+        "file_count": result["file_count"]
+    }
+
+
+@app.get("/directories/reference")
+async def get_reference_directory():
+    """Get reference directory contents"""
+    result = scan_directory(REFERENCE_DIR)
+    return {
+        "path": str(REFERENCE_DIR),
+        "files": result["files"],
+        "total_size": result["total_size"],
+        "file_count": result["file_count"]
+    }
+
+
+@app.post("/directories/refresh")
+async def refresh_directories():
+    """Manually refresh directory cache"""
+    project = scan_directory(PROJECT_DIR)
+    reference = scan_directory(REFERENCE_DIR)
+    
+    return {
+        "project": {
+            "file_count": project["file_count"],
+            "total_size": project["total_size"]
+        },
+        "reference": {
+            "file_count": reference["file_count"],
+            "total_size": reference["total_size"]
+        }
+    }
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     """Send message with document context to LLM"""
     use_local = request.use_local if request.use_local is not None else USE_LOCAL_LLM
     
     try:
-        # Build context from documents
-        context = "Verfügbare Dokumente:\n"
-        for i, doc in enumerate(request.documents, 1):
-            context += f"{i}. {doc['name']}\n"
+        # Build context from uploaded documents
+        context = ""
         
-        context += "\nDokumenteninhalte:\n"
-        for doc in request.documents:
-            context += f"\n--- {doc['name']} ---\n{doc['content']}\n"
+        if request.documents:
+            context += "=== HOCHGELADENE DOKUMENTE ===\n"
+            for i, doc in enumerate(request.documents, 1):
+                context += f"\n{i}. {doc['name']}\n"
+            
+            for doc in request.documents:
+                context += f"\n--- {doc['name']} ---\n{doc['content']}\n"
         
-        system_prompt = f"""Du bist ein AI-Assistent in einer Sandbox-Umgebung mit MCP (Model Context Protocol) für Dokumentenverarbeitung.
+        # Add project directory context
+        if request.include_project:
+            project_data = scan_directory(PROJECT_DIR)
+            if project_data["files"]:
+                context += "\n\n=== PROJEKT-DATEIEN ===\n"
+                for file in project_data["files"]:
+                    context += f"\n--- {file['path']} ---\n{file['content']}\n"
+        
+        # Add reference directory context
+        if request.include_reference:
+            reference_data = scan_directory(REFERENCE_DIR)
+            if reference_data["files"]:
+                context += "\n\n=== REFERENZDOKUMENTE (Normen/Richtlinien) ===\n"
+                for file in reference_data["files"]:
+                    context += f"\n--- {file['path']} ---\n{file['content']}\n"
+        
+        system_prompt = f"""Du bist ein AI-Assistent in einer Sandbox-Umgebung mit MCP (Model Context Protocol) für die Prüfung und Erstellung von Sicherheitsnachweisdokumenttion nach EN 50129.
 
 {context}
 
-Beantworte Fragen basierend auf diesen Dokumenten. Sei präzise und zitiere die Quelle."""
+Beantworte Fragen basierend auf den verfügbaren Dokumenten im Kontext der Sicherheitsnachweisführung. Sei präzise und zitiere die Quelle (inkl. Dateipfad). 
+Wenn du auf Normen oder Richtlinien Bezug nimmst, nenne sie explizit."""
         
         # Choose LLM
         if use_local:
@@ -280,7 +434,7 @@ async def get_models():
     # Check Claude
     models.append({
         "name": "claude-sonnet-4",
-        "available": bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()),
+        "available": ANTHROPIC_AVAILABLE,
         "type": "cloud"
     })
     
@@ -298,12 +452,31 @@ async def health():
     except:
         pass
     
+    # Check directories
+    project_exists = PROJECT_DIR.exists()
+    reference_exists = REFERENCE_DIR.exists()
+    
+    project_files = len(list(PROJECT_DIR.rglob('*'))) if project_exists else 0
+    reference_files = len(list(REFERENCE_DIR.rglob('*'))) if reference_exists else 0
+    
     return {
         "status": "healthy",
         "ollama_available": ollama_available,
         "ollama_host": OLLAMA_HOST,
-        "claude_available": bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.strip()),
-        "default_llm": "local" if USE_LOCAL_LLM else "cloud"
+        "claude_available": ANTHROPIC_AVAILABLE,
+        "default_llm": "local" if USE_LOCAL_LLM else "cloud",
+        "directories": {
+            "project": {
+                "exists": project_exists,
+                "files": project_files,
+                "path": str(PROJECT_DIR)
+            },
+            "reference": {
+                "exists": reference_exists,
+                "files": reference_files,
+                "path": str(REFERENCE_DIR)
+            }
+        }
     }
 
 
