@@ -104,7 +104,7 @@ Die Anwendung ist verfügbar unter:
 Empfohlene Modelle für Dokumentenverarbeitung:
 
 | Modell | Größe | Beschreibung |
-|--------|-------|-------------|
+| ------ | ----- | ----------- |
 | `llama3.2` | ~2GB | Schnell, gut für Chat |
 | `llama3.2:70b` | ~40GB | Sehr leistungsstark |
 | `mistral` | ~4GB | Gut ausbalanciert |

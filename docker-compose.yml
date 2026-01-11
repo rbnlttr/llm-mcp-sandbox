@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -30,10 +28,10 @@ services:
       - PROJECT_DIR=/app/project
       - REFERENCE_DIR=/app/reference
     volumes:
-      - ./backend:/app
-      - ./uploads:/app/uploads
-      - ./project:/app/project
-      - ./reference:/app/reference
+      - ./backend/app:/app
+      - ./data/uploads/data:/app/uploads
+      - ./data/project:/app/project
+      - ./data/reference:/app/reference
       - /app/__pycache__
     depends_on:
       - ollama
@@ -55,3 +53,4 @@ services:
 volumes:
   ollama_data:
   uploads:
+  

@@ -5,14 +5,19 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     poppler-utils \
     libreoffice \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+ENV PYTHONPYCACHEPREFIX=/app/__pycache__
+
+COPY ../requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
+
 
 COPY . .
 
-RUN mkdir -p /app/uploads /app/project /app/reference
+#RUN mkdir -p /app/uploads /app/project /app/reference
 
 EXPOSE 8000
 

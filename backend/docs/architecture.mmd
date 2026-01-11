@@ -1,0 +1,47 @@
+flowchart TB
+    %% ===== API LAYER =====
+    subgraph API["API / Framework Layer"]
+        FastAPI["FastAPI App"]
+        Routes["HTTP Routes"]
+        DI["Dependency Injection"]
+    end
+
+    %% ===== USE CASES =====
+    subgraph USECASES["Application / Use Cases"]
+        ChatService["ChatService"]
+    end
+
+    %% ===== DOMAIN =====
+    subgraph DOMAIN["Domain Layer"]
+        LLMInterface["LLM Interface (Port)"]
+    end
+
+    %% ===== INFRASTRUCTURE =====
+    subgraph INFRA["Infrastructure Layer"]
+        Ollama["Ollama LLM Adapter"]
+        Claude["Claude LLM Adapter"]
+        FileExtractor["FileExtractor"]
+        DirectoryScan["Directory Scanner"]
+        FS["Filesystem"]
+        HTTP["External HTTP APIs"]
+    end
+
+    %% ===== DEPENDENCIES =====
+    FastAPI --> Routes
+    Routes --> DI
+    DI --> ChatService
+
+    ChatService --> LLMInterface
+
+    Ollama --> LLMInterface
+    Claude --> LLMInterface
+
+    DirectoryScan --> FileExtractor
+    FileExtractor --> FS
+
+    Ollama --> HTTP
+    Claude --> HTTP
+
+    %% ===== STYLES =====
+    style DOMAIN fill:#f5f5f5,stroke:#333,stroke-width:2px
+    style USECASES fill:#e3f2fd
