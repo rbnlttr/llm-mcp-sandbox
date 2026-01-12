@@ -1,6 +1,6 @@
 // frontend/src/App.js - COMPLETE VERSION
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, AlertCircle, Server, RefreshCw } from 'lucide-react';
+import { Send, Loader2, AlertCircle, Server, RefreshCw, Cpu, Cloud } from 'lucide-react';
 import axios from 'axios';
 import FileUpload from './components/FileUpload';
 import DirectoryPanel from './components/DirectoryPanel';
