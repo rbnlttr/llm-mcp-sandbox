@@ -1,0 +1,19 @@
+[MASTER]
+disable=C0114,C0115,C0116,R0903,R0913,W0613,E1101
+max-line-length=100
+
+[FORMAT]
+max-line-length=100
+
+[MESSAGES CONTROL]
+disable=too-few-public-methods,
+        too-many-arguments,
+        too-many-locals,
+        too-many-branches,
+        too-many-statements,
+        line-too-long,
+        import-error,
+        no-member,
+        invalid-name,
+        missing-docstring,
+        too-many-instance-attributes

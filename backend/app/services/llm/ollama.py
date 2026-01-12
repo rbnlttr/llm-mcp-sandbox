@@ -8,7 +8,7 @@ class OllamaClient(LLMClient):
         self.model = model
 
     async def chat(self, prompt: str, system_prompt: str) -> dict:
-        async with httpx.AsyncClient(timeout=120) as c:
+        async with httpx.AsyncClient(timeout=600) as c:
             r = await c.post(
                 f"{self.host}/api/generate",
                 json={

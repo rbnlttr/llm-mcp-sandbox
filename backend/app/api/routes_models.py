@@ -7,7 +7,7 @@ router = APIRouter()
 def models():
     return {
         "models": [
-            {"name": settings.local_model, "type": "local"},
-            {"name": "claude-sonnet-4", "type": "cloud"},
+            {"name": settings.LOCAL_MODEL, "type": "local", "available": True},
+            {"name": "claude-sonnet-4", "type": "cloud", "available": bool(settings.ANTHROPIC_API_KEY)},
         ]
     }

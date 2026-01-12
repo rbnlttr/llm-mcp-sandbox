@@ -83,7 +83,10 @@ reference/
 Beim ersten Start lädt Ollama automatisch das gewählte Modell herunter (kann einige Minuten dauern):
 
 ```bash
-# Container bauen und starten
+# Vollständiger Build mit Qualitätsprüfungen
+./build.sh
+
+# Oder manuell: Container bauen und starten
 docker-compose up --build
 
 # Im Hintergrund starten
@@ -229,6 +232,26 @@ graph TD
 - API Key nur im Backend Container
 
 ## Entwicklung
+
+### Build-Skript
+
+Das `build.sh` Skript führt automatisch Qualitätsprüfungen durch:
+
+```bash
+./build.sh
+```
+
+**Was es macht:**
+- ✅ Backend: Flake8 Linting + Pylint + Tests (pytest)
+- ✅ Frontend: ESLint Linting + Tests (Jest)
+- ✅ Container Build + Start
+- ✅ Health Checks
+
+**Voraussetzungen:**
+- Docker läuft
+- Python-Tools: `pip install flake8 pylint pytest` (optional, Skript installiert temporär)
+
+### Manuelle Entwicklung
 
 Frontend Code ändern:
 

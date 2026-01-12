@@ -2,9 +2,6 @@ from pathlib import Path
 import io, PyPDF2, docx, openpyxl
 from pptx import Presentation
 
-class FileExtractionError(Exception):
-    pass
-
 class FileExtractor:
 
     def extract(self, path: Path) -> str:

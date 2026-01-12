@@ -20,37 +20,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://host.docker.internal:11434
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - USE_LOCAL_LLM=${USE_LOCAL_LLM:-true}
       - LOCAL_MODEL=${LOCAL_MODEL:-llama3.2}
-      - UPLOAD_DIR=/app/uploads
-      - PROJECT_DIR=/app/project
-      - REFERENCE_DIR=/app/reference
+      - UPLOAD_DIR=/data/uploads
+      - PROJECT_DIR=/data/project
+      - REFERENCE_DIR=/data/reference
     volumes:
       - ./backend/app:/app
-      - ./data/uploads/data:/app/uploads
-      - ./data/project:/app/project
-      - ./data/reference:/app/reference
+      - ./data/uploads/data:/data/uploads
+      - ./data/project:/data/project
+      - ./data/reference:/data/reference
       - /app/__pycache__
-    depends_on:
-      - ollama
-
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_KEEP_ALIVE=24h
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-volumes:
-  ollama_data:
-  uploads:
   
