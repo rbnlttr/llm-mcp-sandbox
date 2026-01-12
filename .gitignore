@@ -8,6 +8,9 @@ __pycache__/
 # Uploads
 uploads/
 
+# Data directory (local files, should not be committed)
+data/
+
 # Build
 frontend/build/
 
